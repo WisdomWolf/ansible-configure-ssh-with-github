@@ -4,16 +4,25 @@
     name: httplib2
   when: github_username != "" and github_api_token != ""
 
+- name: Synchronize SSH key for upload
+  shell: cat "{{ ansible_env.HOME }}/.ssh/id_rsa.pub"
+  register: new_ssh_key
+  changed_when: False
+
 - name: Add SSH key to Github
   uri:
-    url: https://api.github.com/user/keys?access_token={{ github_api_token }}
+    url: https://api.github.com/user/keys
     method: POST
     body:
       title: "{{ ansible_user_id }}@{{ ansible_hostname }}"
-      key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+      key: "{{ new_ssh_key.stdout }}"
     body_format: json
     status_code: 201
+    headers:
+      Authorization: "token {{ github_api_token }}"
+  register: uri_result
   when: github_username != "" and github_api_token != ""
+  failed_when: "'FAILED' in uri_result.msg and 'already in use' not in uri_result.msg"
 
 - name: Authorize SSH keys from Github
   authorized_key:
